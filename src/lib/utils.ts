@@ -48,3 +48,13 @@ export function getDriveEmbedUrl(fileId: string, startAt: number = 0): string {
 export function getDriveOpenUrl(fileId: string): string {
   return `https://drive.google.com/file/d/${fileId}/view`;
 }
+
+export function fakeEngagement(videoId: number) {
+  const s1 = videoId * 2654435761 >>> 0;
+  const s2 = (videoId * 2246822519) >>> 0;
+  const s3 = (videoId * 3266489917) >>> 0;
+  const views = 5000 + (s1 % 80000);
+  const likes = 800 + (s2 % 12000);
+  const dislikes = Math.round(likes * (0.12 + (s3 % 100) / 500));
+  return { views, likes, dislikes };
+}

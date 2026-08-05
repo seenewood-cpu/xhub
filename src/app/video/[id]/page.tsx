@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import VideoPlayer from '@/components/VideoPlayer';
 import { Video } from '@/types/video';
+import { fakeEngagement } from '@/lib/utils';
 
 const UP_NEXT_COUNT = 6;
 const SEEN_KEY = 'vh-up-next-seen';
@@ -132,6 +133,8 @@ export default function VideoPage() {
     fetchVideo();
   }, [params.id, fetchRelated]);
 
+  const fake = video ? fakeEngagement(video.id) : null;
+
   async function handleReaction(type: 'like' | 'dislike') {
     const fp = getFingerprint();
     try {
@@ -140,12 +143,21 @@ export default function VideoPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fingerprint: fp, reaction: type }),
       });
-      if (res.ok) setReactions(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setReactions({
+          likes: data.likes + (fake?.likes || 3500),
+          dislikes: data.dislikes + (fake?.dislikes || 500),
+          userReaction: data.userReaction,
+        });
+      }
     } catch {}
   }
 
-  const total = reactions.likes + reactions.dislikes;
-  const likePct = total > 0 ? Math.round((reactions.likes / total) * 100) : 50;
+  const displayLikes = fake ? fake.likes + (reactions.userReaction === 'like' ? 1 : 0) : reactions.likes;
+  const displayDislikes = fake ? fake.dislikes + (reactions.userReaction === 'dislike' ? 1 : 0) : reactions.dislikes;
+  const total = displayLikes + displayDislikes;
+  const likePct = total > 0 ? Math.round((displayLikes / total) * 100) : 50;
 
   if (loading) {
     return (
@@ -262,15 +274,8 @@ export default function VideoPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
-                    {(video.view_count || 0).toLocaleString()} views
+                    {(fake?.views || 0).toLocaleString()} views
                   </span>
-                  <time className="text-sm text-[var(--text-muted)]" dateTime={video.created_at}>
-                    {new Date(video.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </time>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -287,7 +292,7 @@ export default function VideoPage() {
                       <svg className="w-5 h-5" fill={reactions.userReaction === 'like' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
                       </svg>
-                      {reactions.likes.toLocaleString()}
+                      {displayLikes.toLocaleString()}
                     </button>
                     <button
                       onClick={() => handleReaction('dislike')}
@@ -301,7 +306,7 @@ export default function VideoPage() {
                       <svg className="w-5 h-5" fill={reactions.userReaction === 'dislike' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
                       </svg>
-                      {reactions.dislikes.toLocaleString()}
+                      {displayDislikes.toLocaleString()}
                     </button>
                   </div>
                 </div>
