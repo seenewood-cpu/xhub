@@ -92,7 +92,7 @@ Home (page.tsx):
 +-- HeroGraphic.tsx (permanent SVG art: rings, dots, geometry)
 +-- Search + Filter Pills
 +-- "All Videos" scroll rail (25 most recent, fetched with ?limit=25)
-+-- Category scroll rails (50 per page, with Previous/Next pagination)
++-- Category scroll rails (50 per page, with Previous/Next pagination, **video count shown in header**)
     +-- VideoCard.tsx (rail tile, hover expand, :has() dimming)
 
 Video Detail (video/[id]/page.tsx):
@@ -447,7 +447,7 @@ The admin panel (`/admin`) has four tabs:
 | Tab | Description |
 |---|---|
 | **Dashboard** | Analytics overview: users, page views, countries, top videos, search trends, recent searches |
-| **Add Video** | Form with title (auto-formatted to Title Case), description, Google Drive URL, multi-category checkboxes (from `categories` table), thumbnail picker |
+| **Add Video** | Form with title (auto-formatted to Title Case), description, Google Drive URL, multi-category checkboxes with video counts (from `categories` table), thumbnail picker |
 | **Editor** | Lists all videos with edit/delete actions. Edit pre-fills the form with existing data including selected categories |
 | **Categories** | Add new categories, delete existing ones. Categories populate the video form checkboxes and homepage filter pills. Shows category count based on `video_categories` junction |
 

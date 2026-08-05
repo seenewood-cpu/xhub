@@ -601,7 +601,9 @@ export default function AdminPage() {
               <div>
                 <label className="label">Categories</label>
                 <div className="flex flex-wrap gap-3">
-                  {categories.map((cat) => (
+                  {categories.map((cat) => {
+                    const videoCount = videos.filter(v => v.category_ids && v.category_ids.includes(cat.id)).length;
+                    return (
                     <label key={cat.id} className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-surface)] rounded-xl border border-[var(--border)] hover:border-[var(--border-hover)] cursor-pointer transition-all">
                       <input
                         type="checkbox"
@@ -616,8 +618,10 @@ export default function AdminPage() {
                         className="w-4 h-4 rounded border-[var(--border)] text-indigo focus:ring-indigo"
                       />
                       <span className="text-sm text-[var(--text-primary)]">{cat.name}</span>
+                      <span className="text-xs text-[var(--text-muted)]">({videoCount})</span>
                     </label>
-                  ))}
+                    );
+                  })}
                   {categories.length === 0 && (
                     <p className="text-sm text-[var(--text-muted)]">No categories yet. Add one in the Categories tab.</p>
                   )}

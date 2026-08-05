@@ -25,6 +25,7 @@ export default function GalleryPage() {
   const [categoryVideos, setCategoryVideos] = useState<Record<string, Video[]>>({});
   const [categoryPages, setCategoryPages] = useState<Record<string, number>>({});
   const [categoryTotalPages, setCategoryTotalPages] = useState<Record<string, number>>({});
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
 
   const [searchResults, setSearchResults] = useState<Video[]>([]);
 
@@ -86,6 +87,7 @@ export default function GalleryPage() {
       setCategoryVideos(prev => ({ ...prev, [cat]: result.data }));
       setCategoryPages(prev => ({ ...prev, [cat]: result.page }));
       setCategoryTotalPages(prev => ({ ...prev, [cat]: result.totalPages }));
+      setCategoryCounts(prev => ({ ...prev, [cat]: result.total }));
     } catch (error) {
       console.error(`Error fetching category ${cat}:`, error);
     }
@@ -254,6 +256,9 @@ export default function GalleryPage() {
                   <h2 className="px-4 sm:px-12 mb-1 text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
                     <span className="w-1 h-5 bg-gradient-to-b from-coral to-lavender rounded-full" />
                     {cat}
+                    {categoryCounts[cat] !== undefined && (
+                      <span className="text-sm font-normal text-[var(--text-muted)]">({categoryCounts[cat]})</span>
+                    )}
                   </h2>
                   <div className="scroll-rail-inner" role="list">
                     {catVids.map((video) => (
