@@ -73,6 +73,25 @@ export async function PUT(
       }
     }
 
+    if (body.title) {
+      const newTitle = toTitleCase(body.title);
+      if (newTitle !== existing.title) {
+        const { data: duplicateVideo } = await supabase
+          .from('videos')
+          .select('id')
+          .ilike('title', newTitle)
+          .neq('id', id)
+          .limit(1);
+
+        if (duplicateVideo && duplicateVideo.length > 0) {
+          return NextResponse.json(
+            { error: `A video with the title "${newTitle}" already exists. Please choose a different name.` },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     const categoryIds: number[] | undefined = body.category_ids;
 
     const { data, error } = await supabase

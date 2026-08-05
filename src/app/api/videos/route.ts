@@ -133,13 +133,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const titleCased = toTitleCase(body.title);
+
+    const { data: existingVideo } = await supabase
+      .from('videos')
+      .select('id')
+      .ilike('title', titleCased)
+      .limit(1);
+
+    if (existingVideo && existingVideo.length > 0) {
+      return NextResponse.json(
+        { error: `A video with the title "${titleCased}" already exists. Please choose a different name.` },
+        { status: 409 }
+      );
+    }
+
     const categoryIds: number[] = body.category_ids || [];
 
     const { data, error } = await supabase
       .from('videos')
       .insert([
         {
-          title: toTitleCase(body.title),
+          title: titleCased,
           description: body.description || '',
           drive_url: body.drive_url,
           drive_file_id: fileId,

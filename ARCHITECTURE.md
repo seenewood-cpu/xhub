@@ -297,9 +297,9 @@ These must be run manually in the Supabase SQL Editor dashboard.
 | Method | Route | Description |
 |---|---|---|
 | GET | `/api/videos` | List videos. `?search=` (title ILIKE), `?category=` (exact match), `?limit=N`, `?page=N`. Without pagination params returns full array (backward-compatible). With params returns `{ data, total, page, pageSize, totalPages }` |
-| POST | `/api/videos` | Create video. Validates title + drive_url, extracts file ID, auto-formats title to Title Case, inserts |
+| POST | `/api/videos` | Create video. Validates title + drive_url, extracts file ID, auto-formats title to Title Case, **rejects duplicate titles** (409), inserts |
 | GET | `/api/videos/[id]` | Fetch single video (404 if missing) |
-| PUT | `/api/videos/[id]` | Update fields; auto-formats title to Title Case; re-extracts file ID only when `drive_url` changes |
+| PUT | `/api/videos/[id]` | Update fields; auto-formats title to Title Case; **rejects duplicate titles** (409); re-extracts file ID only when `drive_url` changes |
 | DELETE | `/api/videos/[id]` | Delete video |
 | POST | `/api/videos/[id]/view` | Increment view count by 1, returns new count |
 | GET | `/api/drive-status` | `?id=` — server-side check of the Drive file; returns `ok` / `restricted` / `missing` / `unknown` |
@@ -318,6 +318,13 @@ These must be run manually in the Supabase SQL Editor dashboard.
 All video titles are auto-formatted to Title Case on create and update via `toTitleCase()`
 in `src/lib/utils.ts`. Small words (a, an, the, and, of, in, etc.) remain lowercase unless
 they are the first word. Example: "the lord of the rings" becomes "The Lord of the Rings".
+
+### Duplicate Title Prevention
+
+Both create (POST) and update (PUT) endpoints check for existing videos with the same title
+before saving. The check is **case-insensitive** (`ilike`). If a duplicate is found, the
+API returns HTTP 409 with a descriptive error message (e.g., `A video with the title "..." already exists`).
+The admin dashboard displays this as a red error notification via `formError`.
 
 ### Pop-Out Button Blocker
 
