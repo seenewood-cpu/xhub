@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Video } from '@/types/video';
+import { fakeEngagement } from '@/lib/utils';
 
 interface VideoCardProps {
   video: Video;
@@ -11,6 +12,7 @@ interface VideoCardProps {
 
 export default function VideoCard({ video }: VideoCardProps) {
   const [thumbnailError, setThumbnailError] = useState(false);
+  const fake = fakeEngagement(video.id);
   const thumbnailUrl = video.drive_file_id
     ? `https://drive.google.com/thumbnail?id=${video.drive_file_id}&sz=w480`
     : '';
@@ -98,16 +100,14 @@ export default function VideoCard({ video }: VideoCardProps) {
           </h3>
           <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
             {video.category && <span>{video.category}</span>}
-            {video.category && video.view_count > 0 && <span>·</span>}
-            {video.view_count > 0 && (
-              <span className="flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                {formatViews(video.view_count)}
-              </span>
-            )}
+            {video.category && <span>·</span>}
+            <span className="flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              {formatViews(fake.views)}
+            </span>
           </div>
         </div>
       </Link>
