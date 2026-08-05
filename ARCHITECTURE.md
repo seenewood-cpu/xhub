@@ -4,8 +4,9 @@
 
 V HUB is a Netflix-inspired video gallery that streams videos hosted on Google Drive.
 Features a Gen Z color palette, animated gradient backgrounds, horizontal scroll rails,
-glassmorphism, SVG art hero, admin panel with analytics, category management, pagination,
-footer navigation with content pages, and a title-case formatter for video entries.
+glassmorphism, SVG art hero, admin panel with analytics, multi-category management,
+pagination, footer navigation with content pages, like/dislike reactions with fingerprint
+deduplication, deterministic fake engagement stats, and a title-case formatter for video entries.
 
 | Aspect | Value |
 |---|---|
@@ -211,7 +212,7 @@ CREATE TABLE videos (
   drive_url     TEXT NOT NULL,           -- full Google Drive view URL
   drive_file_id TEXT NOT NULL,           -- extracted file ID used for embeds
   thumbnail_url TEXT DEFAULT '',         -- user-selected thumbnail override
-  category      TEXT DEFAULT '',         -- references categories.name
+  category      TEXT DEFAULT '',         -- legacy single-category field (still populated)
   view_count    INTEGER DEFAULT 0,       -- incremented on each video page visit
   created_at    TIMESTAMPTZ DEFAULT now()
 );
@@ -226,6 +227,36 @@ CREATE TABLE categories (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 ```
+
+### `video_categories` junction table (many-to-many)
+
+```sql
+CREATE TABLE video_categories (
+  video_id    BIGINT REFERENCES videos(id) ON DELETE CASCADE,
+  category_id BIGINT REFERENCES categories(id) ON DELETE CASCADE,
+  PRIMARY KEY (video_id, category_id)
+);
+```
+
+Videos can belong to multiple categories. The API returns `category_ids: number[]` on each
+video. Category filtering uses a subquery on this junction table. The legacy `category` column
+on `videos` is retained for backward compatibility but the junction table is the source of truth.
+
+### `video_reactions` table
+
+```sql
+CREATE TABLE video_reactions (
+  id                BIGSERIAL PRIMARY KEY,
+  video_id          BIGINT REFERENCES videos(id) ON DELETE CASCADE,
+  user_fingerprint  TEXT NOT NULL,
+  reaction          TEXT NOT NULL CHECK (reaction IN ('like', 'dislike')),
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(video_id, user_fingerprint)
+);
+```
+
+One reaction per user per video (deduped by browser fingerprint stored in `localStorage`).
+Toggling the same reaction removes it; switching reaction type updates the row.
 
 ### `analytics` table
 
@@ -252,7 +283,8 @@ CREATE TABLE searches (
 ```
 
 SQL migration files are at `supabase/migrations/001_create_categories.sql`,
-`002_create_analytics.sql`, and `20250101000000_add_thumbnail_url.sql`.
+`002_create_analytics.sql`, `003_create_video_categories.sql`,
+`004_create_video_reactions.sql`, and `20250101000000_add_thumbnail_url.sql`.
 These must be run manually in the Supabase SQL Editor dashboard.
 
 - RLS policies: `SELECT`, `INSERT`, `UPDATE`, `DELETE` all `USING (true)` /
@@ -273,8 +305,10 @@ These must be run manually in the Supabase SQL Editor dashboard.
 | GET | `/api/drive-status` | `?id=` — server-side check of the Drive file; returns `ok` / `restricted` / `missing` / `unknown` |
 | POST | `/api/auth` | Admin login check. Validates email + password against `ADMIN_EMAIL` and `ADMIN_PASSWORD` env vars. No hardcoded fallback |
 | GET | `/api/categories` | List all categories, ordered by name. Returns `[]` if table doesn't exist |
-| POST | `/api/categories` | Create category. Validates name, handles unique constraint (409), missing table (500) |
+| POST | `/api/categories` | Create category. Validates name, handles unique constraint (409), missing table (500). Broadened error handling for `42P01`, `42703`, `42501` codes |
 | DELETE | `/api/categories/[id]` | Delete category by ID |
+| GET | `/api/videos/[id]/reactions` | Get like/dislike counts + user's reaction. Query param `?fingerprint=` for per-user reaction lookup |
+| POST | `/api/videos/[id]/reactions` | Toggle like/dislike. Body: `{ fingerprint, reaction }`. Toggles off if same reaction, switches if different. Returns updated counts |
 | POST | `/api/analytics` | Track event. Accepts `{ event_type, metadata }`. Extracts client IP from headers. Fire-and-forget from client |
 | POST | `/api/analytics/search` | Track search query. Accepts `{ query, results_count }` |
 | GET | `/api/admin/stats` | Aggregated analytics: total users, active users (7d), countries, top 5 videos, most-searched topics, most-searched videos, recent searches, total page views |
@@ -308,19 +342,15 @@ Homepage behavior:
 ## 6. Deployment
 
 - Provider: Vercel (project `video-hub`)
-- Build: `npm run build` then `npx vercel --prod --yes` (with env flags, see section 8).
-- Vercel does **not** persist env vars for this project — they must be re-passed
-  via `--env` flags on every deploy (or added in the Vercel dashboard).
-- Full deploy command:
+- Build: `npm run build` then `npx vercel --prod --yes`.
+- Env vars are persisted on Vercel (added via `npx vercel env add`), so future deploys
+  don't need `--env` flags. If vars are missing, re-add them with `npx vercel env add`.
+- Deploy command:
 
 ```bash
 cd /Users/mohitkashyap/video-hub
-npx vercel --prod --yes \
-  --env NEXT_PUBLIC_SUPABASE_URL=<supabase-url> \
-  --env NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key> \
-  --env SUPABASE_SERVICE_ROLE_KEY=<supabase-service-role-key> \
-  --env ADMIN_EMAIL=<admin-email> \
-  --env ADMIN_PASSWORD=<admin-password>
+npm run build
+npx vercel --prod --yes
 ```
 
 - Local dev: `npm run dev` (reads `.env.local`).
@@ -349,8 +379,8 @@ Tracking is fire-and-forget from the client side:
 
 ## 8. Environment Variables
 
-> Store these in `.env.local` for local dev; pass to Vercel at deploy time.
-> Never commit secrets to git.
+> Store these in `.env.local` for local dev. Vercel env vars are persisted (added via
+> `npx vercel env add`). Never commit secrets to git.
 
 | Variable | Description | Exposed to client |
 |---|---|---|
@@ -377,7 +407,7 @@ Tracking is fire-and-forget from the client side:
 | **Footer** | 3-column nav (vHub, Help, Legal) with 11 links to content pages. Appears on all pages including admin |
 | **ThemeProvider** | Persists theme to `localStorage` (`vh-theme` key), respects `prefers-color-scheme`, applies `data-theme` attribute to `<html>` |
 | **HeroGraphic** | Permanent SVG art with 3 rotating rings, orbiting dots, geometric shapes, pulsing glow |
-| **VideoCard (rail)** | Hover: scales to 1.15x, z-index 10, play button fades in. Siblings dim to 0.4 opacity via `:has()`. Shows view count and category badge |
+| **VideoCard (rail)** | Hover: scales to 1.15x, z-index 10, play button fades in. Siblings dim to 0.4 opacity via `:has()`. Shows fake deterministic view count and category badge |
 | **VideoPlayer** | Click-to-play with gradient spinner, progress bar, Drive status pre-check. Pop-out button blocked via transparent overlay with `!important` CSS |
 | **ThumbnailPicker** | Tests 4 sizes (Default/Large/HD/Square), shows only valid ones |
 | **ContentPage** | Shared layout for all content pages: aurora background, glass card, back link, title + last-updated date |
@@ -410,9 +440,9 @@ The admin panel (`/admin`) has four tabs:
 | Tab | Description |
 |---|---|
 | **Dashboard** | Analytics overview: users, page views, countries, top videos, search trends, recent searches |
-| **Add Video** | Form with title (auto-formatted to Title Case), description, Google Drive URL, category dropdown (from `categories` table), thumbnail picker |
-| **Editor** | Lists all videos with edit/delete actions. Edit pre-fills the form with existing data |
-| **Categories** | Add new categories, delete existing ones. Categories populate the video form dropdown and homepage filter pills |
+| **Add Video** | Form with title (auto-formatted to Title Case), description, Google Drive URL, multi-category checkboxes (from `categories` table), thumbnail picker |
+| **Editor** | Lists all videos with edit/delete actions. Edit pre-fills the form with existing data including selected categories |
+| **Categories** | Add new categories, delete existing ones. Categories populate the video form checkboxes and homepage filter pills. Shows category count based on `video_categories` junction |
 
 Authentication: email + password via `POST /api/auth`. Credentials checked against
 `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables. Client-side state only
@@ -422,17 +452,45 @@ Authentication: email + password via `POST /api/auth`. Credentials checked again
 
 The video detail page sidebar shows 6 related videos with the following logic:
 
-1. **Same category first** — Prioritizes videos from the current video's category
+1. **Shared categories first** — Prioritizes videos that share at least one category with the current video (via `video_categories` junction)
 2. **No repeats** — Uses `sessionStorage` (`vh-up-next-seen`) to track every video ID
    that has appeared in "Up Next" during the browser session. Previously shown IDs are
    excluded from future lists
-3. **Fallback to other categories** — If same-category videos run out, fills remaining
-   slots from other categories (also excluding seen IDs)
+3. **Fallback to all videos** — If same-category videos run out, fills remaining
+   slots from ALL videos (also excluding seen IDs), not just other categories
 4. **Auto-reset** — When all videos are exhausted, clears the seen list and starts fresh
 5. **Persists across navigations** — `sessionStorage` survives page-to-page navigation
    within the same tab; clears on tab close
 
-## 13. Known Gotchas
+## 13. Fake Engagement Stats
+
+View counts, likes, and dislikes displayed on video pages, the Up Next sidebar, and the
+homepage VideoCard are **deterministic fake numbers** — not real. They are generated by
+`fakeEngagement(videoId)` in `src/lib/utils.ts` using bitwise operations on the video ID
+to produce unique-per-video but non-real values:
+
+- Views: 5,000 – 85,000
+- Likes: 800 – 12,000
+- Dislikes: 12% – 25% of likes
+
+The user's own like/dislike adjusts the displayed count by +1 from the base. Real
+`view_count` from the database is not displayed to end users. Real upload dates are
+also hidden from the video detail page.
+
+## 14. Like/Dislike Reactions
+
+The video detail page has like/dislike buttons with a small percentage meter.
+Reactions are stored in the `video_reactions` table, deduped by browser fingerprint
+(stored in `localStorage` as `vh-fingerprint`). Behavior:
+
+- Click like when no reaction: inserts a like
+- Click like when already liked: removes the like (toggle off)
+- Click dislike when liked: switches to dislike
+- Click like when disliked: switches to like
+- Counts returned by `GET /api/videos/[id]/reactions?fingerprint=...`
+- User's current reaction returned so buttons can show active state
+
+## 15. Known Gotchas
 
 - **Drive sharing required**: every video's Drive file MUST be set to
   "Anyone with the link can view". Restricted files return HTTP 401 and show the
@@ -443,7 +501,7 @@ The video detail page sidebar shows 6 related videos with the following logic:
   embed may fail. The fallback "Open in Google Drive" link mitigates this.
 - **Seeds**: `scripts/seed-supabase.mjs` deletes rows whose `drive_file_id` matches
   known fake placeholder IDs, then inserts public sample videos (skipping duplicates).
-- **Vercel env vars**: must be re-passed via `--env` flags on every deploy (not persisted).
+- **Vercel env vars**: persisted via `npx vercel env add`. If missing after deploy, re-add them in Vercel dashboard or CLI.
 - **`@property` CSS**: conic gradient animation uses `@property --gradient-angle` which requires
   Chromium browsers. Falls back to static gradient in Firefox/Safari.
 - **`:has()` selector**: sibling dimming uses CSS `:has()` which requires Chromium 105+ / Safari 15.4+.
