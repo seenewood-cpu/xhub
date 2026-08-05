@@ -565,6 +565,21 @@ select.input-field {
               0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
+.drive-popout-blocker {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 56px !important;
+  height: 56px !important;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+  background: transparent !important;
+  cursor: default !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
 /* ============================================
    SKELETON LOADING
    ============================================ */

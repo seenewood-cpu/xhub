@@ -10,7 +10,9 @@ export async function GET() {
       .order('name');
 
     if (error) {
-      if (error.message?.includes('does not exist') || error.code === '42P01') {
+      const msg = (error.message || error.details || error.hint || '').toLowerCase();
+      const code = error.code || '';
+      if (msg.includes('does not exist') || msg.includes('relation') || code === '42P01' || code === '42703') {
         return NextResponse.json([]);
       }
       throw error;
@@ -41,18 +43,21 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      if (error.message?.includes('does not exist') || error.code === '42P01') {
+      const msg = (error.message || error.details || error.hint || '').toLowerCase();
+      const code = error.code || '';
+      if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('row-level security') || code === '42P01' || code === '42703' || code === '42501') {
         return NextResponse.json(
-          { error: 'Categories table not found. Please create it in your Supabase dashboard.' },
+          { error: 'Categories table not found or not accessible. Please run the migration SQL in your Supabase dashboard SQL Editor.' },
           { status: 500 }
         );
       }
-      if (error.code === '23505') {
+      if (code === '23505') {
         return NextResponse.json(
           { error: 'Category already exists' },
           { status: 409 }
         );
       }
+      console.error('Supabase error creating category:', { code, message: error.message, details: error.details, hint: error.hint });
       throw error;
     }
 

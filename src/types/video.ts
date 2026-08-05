@@ -6,6 +6,7 @@ export interface Video {
   drive_file_id: string;
   thumbnail_url: string;
   category: string;
+  category_ids?: number[];
   view_count: number;
   created_at: string;
 }
@@ -16,4 +17,5 @@ export interface VideoFormData {
   drive_url: string;
   thumbnail_url?: string;
   category?: string;
+  category_ids?: number[];
 }

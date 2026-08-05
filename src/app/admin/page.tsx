@@ -39,6 +39,7 @@ export default function AdminPage() {
   const [statsLoading, setStatsLoading] = useState(false);
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState('');
   const [categorySuccess, setCategorySuccess] = useState('');
@@ -160,7 +161,7 @@ export default function AdminPage() {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, thumbnail_url: selectedThumbnail || '' }),
+        body: JSON.stringify({ ...formData, thumbnail_url: selectedThumbnail || '', category_ids: selectedCategoryIds }),
       });
       if (!response.ok) {
         const data = await response.json();
@@ -193,6 +194,7 @@ export default function AdminPage() {
       drive_url: video.drive_url,
       category: video.category || '',
     });
+    setSelectedCategoryIds(video.category_ids || []);
     setSelectedThumbnail(video.thumbnail_url || null);
     setFormError('');
     setFormSuccess('');
@@ -201,6 +203,7 @@ export default function AdminPage() {
 
   function resetForm() {
     setFormData({ title: '', description: '', drive_url: '', category: '' });
+    setSelectedCategoryIds([]);
     setEditingId(null);
     setSelectedThumbnail(null);
   }
@@ -596,15 +599,29 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label htmlFor="category" className="label">Category</label>
-                <select id="category" value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="input-field">
-                  <option value="">None</option>
+                <label className="label">Categories</label>
+                <div className="flex flex-wrap gap-3">
                   {categories.map((cat) => (
-                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    <label key={cat.id} className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-surface)] rounded-xl border border-[var(--border)] hover:border-[var(--border-hover)] cursor-pointer transition-all">
+                      <input
+                        type="checkbox"
+                        checked={selectedCategoryIds.includes(cat.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCategoryIds([...selectedCategoryIds, cat.id]);
+                          } else {
+                            setSelectedCategoryIds(selectedCategoryIds.filter(id => id !== cat.id));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-[var(--border)] text-indigo focus:ring-indigo"
+                      />
+                      <span className="text-sm text-[var(--text-primary)]">{cat.name}</span>
+                    </label>
                   ))}
-                </select>
+                  {categories.length === 0 && (
+                    <p className="text-sm text-[var(--text-muted)]">No categories yet. Add one in the Categories tab.</p>
+                  )}
+                </div>
               </div>
 
               {formError && (
@@ -674,7 +691,7 @@ export default function AdminPage() {
             ) : (
               <div className="space-y-2">
                 {categories.map((cat) => {
-                  const videoCount = videos.filter(v => v.category === cat.name).length;
+                  const videoCount = videos.filter(v => v.category_ids && v.category_ids.includes(cat.id)).length;
                   return (
                     <div key={cat.id} className="flex items-center justify-between p-3 bg-[var(--bg-surface)] rounded-xl border border-[var(--border)]">
                       <div className="flex items-center gap-3">
@@ -747,8 +764,10 @@ export default function AdminPage() {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-[var(--text-primary)] truncate">{video.title}</h3>
                       <p className="text-sm text-[var(--text-muted)] truncate">
-                        {video.category && <span className="text-indigo">{video.category}</span>}
-                        {video.category && ' · '}
+                        {video.category_ids && video.category_ids.length > 0 && (
+                          <span className="text-indigo">{video.category_ids.length} categor{video.category_ids.length === 1 ? 'y' : 'ies'}</span>
+                        )}
+                        {video.category_ids && video.category_ids.length > 0 && ' · '}
                         {new Date(video.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>

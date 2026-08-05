@@ -23,7 +23,14 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(data);
+    const { data: vcData } = await supabase
+      .from('video_categories')
+      .select('category_id')
+      .eq('video_id', data.id);
+
+    const categoryIds = (vcData || []).map((r: { category_id: number }) => r.category_id);
+
+    return NextResponse.json({ ...data, category_ids: categoryIds });
   } catch (error) {
     console.error('Error fetching video:', error);
     return NextResponse.json(
@@ -66,6 +73,8 @@ export async function PUT(
       }
     }
 
+    const categoryIds: number[] | undefined = body.category_ids;
+
     const { data, error } = await supabase
       .from('videos')
       .update({
@@ -74,7 +83,6 @@ export async function PUT(
         drive_url: body.drive_url || existing.drive_url,
         drive_file_id: fileId,
         thumbnail_url: body.thumbnail_url ?? existing.thumbnail_url,
-        category: body.category ?? existing.category,
       })
       .eq('id', id)
       .select()
@@ -84,7 +92,22 @@ export async function PUT(
       throw error;
     }
 
-    return NextResponse.json(data);
+    if (categoryIds !== undefined) {
+      await supabase
+        .from('video_categories')
+        .delete()
+        .eq('video_id', data.id);
+
+      if (categoryIds.length > 0) {
+        const vcRows = categoryIds.map((cid: number) => ({
+          video_id: data.id,
+          category_id: cid,
+        }));
+        await supabase.from('video_categories').insert(vcRows);
+      }
+    }
+
+    return NextResponse.json({ ...data, category_ids: categoryIds || [] });
   } catch (error) {
     console.error('Error updating video:', error);
     return NextResponse.json(
@@ -114,6 +137,11 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    await supabase
+      .from('video_categories')
+      .delete()
+      .eq('video_id', existing.id);
 
     const { error } = await supabase.from('videos').delete().eq('id', id);
 

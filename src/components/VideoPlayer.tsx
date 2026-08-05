@@ -211,6 +211,16 @@ export default function VideoPlayer({ fileId, title, startAt = 0 }: VideoPlayerP
           onLoad={handleIframeLoad}
           onError={handleIframeError}
         />
+
+        {/* Permanently block Google Drive pop-out button */}
+        <div
+          className="drive-popout-blocker"
+          onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          onMouseUp={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          aria-hidden="true"
+        />
       </div>
 
       {/* Keyboard shortcuts hint */}

@@ -1,10 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import VideoPlayer from '@/components/VideoPlayer';
 import { Video } from '@/types/video';
+
+const UP_NEXT_COUNT = 6;
+const SEEN_KEY = 'vh-up-next-seen';
+
+function getSeenIds(): Set<number> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = sessionStorage.getItem(SEEN_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function addSeenIds(ids: number[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const seen = getSeenIds();
+    ids.forEach((id) => seen.add(id));
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+  } catch {}
+}
+
+function clearSeenIds() {
+  if (typeof window === 'undefined') return;
+  try { sessionStorage.removeItem(SEEN_KEY); } catch {}
+}
 
 export default function VideoPage() {
   const params = useParams();
@@ -12,34 +39,70 @@ export default function VideoPage() {
   const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const seenRef = useRef<Set<number>>(new Set());
+
+  const fetchRelated = useCallback(async (currentVideo: Video) => {
+    try {
+      const response = await fetch('/api/videos');
+      const allVideos: Video[] = await response.json();
+
+      const seen = getSeenIds();
+      seenRef.current = seen;
+
+      const currentCatIds = new Set(currentVideo.category_ids || []);
+      const sameCategory = allVideos.filter(
+        (v) => v.id !== currentVideo.id && (v.category_ids || []).some((id: number) => currentCatIds.has(id))
+      );
+
+      let picks = sameCategory.filter((v) => !seen.has(v.id));
+
+      if (picks.length < UP_NEXT_COUNT) {
+        const extras = allVideos.filter(
+          (v) => v.id !== currentVideo.id && !seen.has(v.id) && !picks.includes(v)
+        );
+        picks = [...picks, ...extras];
+      }
+
+      if (picks.length < UP_NEXT_COUNT) {
+        clearSeenIds();
+        seenRef.current = new Set([currentVideo.id]);
+        picks = sameCategory;
+      }
+
+      const final = picks.slice(0, UP_NEXT_COUNT);
+      addSeenIds(final.map((v) => v.id));
+      setRelatedVideos(final);
+    } catch (err) {
+      console.error('Error fetching related videos:', err);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchVideo() {
+      setLoading(true);
       try {
         const response = await fetch(`/api/videos/${params.id}`);
         if (!response.ok) throw new Error('Video not found');
         const data = await response.json();
         setVideo(data);
 
-        // Increment view count
-        fetch(`/api/videos/${params.id}/view`, { method: 'POST' }).then(res => {
-          if (res.ok) res.json().then(d => {
-            setVideo(prev => prev ? { ...prev, view_count: d.view_count } : prev);
-          });
+        fetch('/api/videos/${params.id}/view', { method: 'POST' }).then((res) => {
+          if (res.ok)
+            res.json().then((d) => {
+              setVideo((prev) => (prev ? { ...prev, view_count: d.view_count } : prev));
+            });
         });
 
         fetch('/api/analytics', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event_type: 'video_view', metadata: { video_id: data.id, title: data.title } }),
+          body: JSON.stringify({
+            event_type: 'video_view',
+            metadata: { video_id: data.id, title: data.title },
+          }),
         }).catch(() => {});
 
-        const allResponse = await fetch('/api/videos');
-        const allVideos = await allResponse.json();
-        const related = allVideos
-          .filter((v: Video) => v.id !== data.id)
-          .slice(0, 8);
-        setRelatedVideos(related);
+        await fetchRelated(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load video');
       } finally {
@@ -47,7 +110,7 @@ export default function VideoPage() {
       }
     }
     fetchVideo();
-  }, [params.id]);
+  }, [params.id, fetchRelated]);
 
   if (loading) {
     return (
@@ -110,7 +173,6 @@ export default function VideoPage() {
         <div className="aurora-blob aurora-blob-2" />
       </div>
 
-      {/* Ambient glow from thumbnail */}
       {thumbUrl && (
         <div className="fixed inset-0 pointer-events-none z-0">
           <img
@@ -125,7 +187,6 @@ export default function VideoPage() {
       )}
 
       <div className="relative z-10 max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 pt-24 pb-16">
-        {/* Breadcrumb */}
         <nav className="mb-6" aria-label="Breadcrumb">
           <ol className="flex items-center space-x-2 text-sm">
             <li>
@@ -148,7 +209,6 @@ export default function VideoPage() {
         </nav>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Main Content */}
           <div className="flex-1 min-w-0">
             <article>
               <VideoPlayer fileId={video.drive_file_id} title={video.title} />
@@ -181,7 +241,6 @@ export default function VideoPage() {
             </article>
           </div>
 
-          {/* Sidebar - Up Next */}
           {relatedVideos.length > 0 && (
             <aside className="w-full lg:w-[380px] flex-shrink-0" aria-label="Related videos">
               <div className="sticky top-24">
@@ -201,15 +260,15 @@ export default function VideoPage() {
                           <img
                             src={`https://drive.google.com/thumbnail?id=${related.drive_file_id}&sz=w320`}
                             alt={related.title}
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                            className="w-full h-full object-cover"
+                            loading="lazy"
                             onError={(e) => {
                               (e.currentTarget as HTMLImageElement).style.display = 'none';
                             }}
-                            loading="lazy"
                           />
                         )}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <div className="w-10 h-10 bg-indigo/80 rounded-full flex items-center justify-center shadow-lg">
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="w-10 h-10 bg-indigo/90 rounded-full flex items-center justify-center">
                             <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M8 5v14l11-7z" />
                             </svg>
@@ -217,18 +276,12 @@ export default function VideoPage() {
                         </div>
                       </div>
                       <div className="flex-1 min-w-0 py-1">
-                        <h3 className="text-sm font-semibold text-[var(--text-primary)] line-clamp-2 group-hover:text-indigo transition-colors mb-1">
+                        <h3 className="text-sm font-medium text-[var(--text-primary)] line-clamp-2 group-hover:text-indigo transition-colors">
                           {related.title}
                         </h3>
-                        {related.category && (
-                          <p className="text-xs text-indigo/70 mb-1">{related.category}</p>
-                        )}
-                        <time className="text-[11px] text-[var(--text-muted)] block" dateTime={related.created_at}>
-                          {new Date(related.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </time>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          {(related.view_count || 0).toLocaleString()} views
+                        </p>
                       </div>
                     </Link>
                   ))}
