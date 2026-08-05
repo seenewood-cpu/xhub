@@ -66,19 +66,21 @@ export default function VideoPage() {
         (v) => v.id !== currentVideo.id && (v.category_ids || []).some((id: number) => currentCatIds.has(id))
       );
 
+      const unseen = allVideos.filter(
+        (v) => v.id !== currentVideo.id && !seen.has(v.id)
+      );
+
       let picks = sameCategory.filter((v) => !seen.has(v.id));
 
       if (picks.length < UP_NEXT_COUNT) {
-        const extras = allVideos.filter(
-          (v) => v.id !== currentVideo.id && !seen.has(v.id) && !picks.includes(v)
-        );
+        const extras = unseen.filter((v) => !picks.includes(v));
         picks = [...picks, ...extras];
       }
 
       if (picks.length < UP_NEXT_COUNT) {
         clearSeenIds();
         seenRef.current = new Set([currentVideo.id]);
-        picks = sameCategory;
+        picks = allVideos.filter((v) => v.id !== currentVideo.id);
       }
 
       const final = picks.slice(0, UP_NEXT_COUNT);
@@ -304,14 +306,12 @@ export default function VideoPage() {
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <div className="flex items-center gap-3 mb-1.5">
-                    <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden border border-[var(--border)]">
-                      <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500" style={{ width: `${likePct}%` }} />
-                    </div>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="w-24 h-1.5 bg-[var(--bg-surface)] rounded-full overflow-hidden border border-[var(--border)]">
+                    <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500" style={{ width: `${likePct}%` }} />
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">
-                    {total > 0 ? `${likePct}% liked this video` : 'No ratings yet'}
+                    {total > 0 ? `${likePct}% liked` : 'No ratings'}
                   </p>
                 </div>
               </div>
