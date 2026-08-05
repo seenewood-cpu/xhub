@@ -8,6 +8,7 @@ import { Video } from '@/types/video';
 
 const UP_NEXT_COUNT = 6;
 const SEEN_KEY = 'vh-up-next-seen';
+const FP_KEY = 'vh-fingerprint';
 
 function getSeenIds(): Set<number> {
   if (typeof window === 'undefined') return new Set();
@@ -33,12 +34,23 @@ function clearSeenIds() {
   try { sessionStorage.removeItem(SEEN_KEY); } catch {}
 }
 
+function getFingerprint(): string {
+  if (typeof window === 'undefined') return '';
+  let fp = localStorage.getItem(FP_KEY);
+  if (!fp) {
+    fp = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(FP_KEY, fp);
+  }
+  return fp;
+}
+
 export default function VideoPage() {
   const params = useParams();
   const [video, setVideo] = useState<Video | null>(null);
   const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<{ likes: number; dislikes: number; userReaction: string | null }>({ likes: 0, dislikes: 0, userReaction: null });
   const seenRef = useRef<Set<number>>(new Set());
 
   const fetchRelated = useCallback(async (currentVideo: Video) => {
@@ -102,6 +114,12 @@ export default function VideoPage() {
           }),
         }).catch(() => {});
 
+        const fp = getFingerprint();
+        fetch(`/api/videos/${params.id}/reactions?fingerprint=${fp}`)
+          .then(r => r.json())
+          .then(d => setReactions(d))
+          .catch(() => {});
+
         await fetchRelated(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load video');
@@ -111,6 +129,21 @@ export default function VideoPage() {
     }
     fetchVideo();
   }, [params.id, fetchRelated]);
+
+  async function handleReaction(type: 'like' | 'dislike') {
+    const fp = getFingerprint();
+    try {
+      const res = await fetch(`/api/videos/${params.id}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fingerprint: fp, reaction: type }),
+      });
+      if (res.ok) setReactions(await res.json());
+    } catch {}
+  }
+
+  const total = reactions.likes + reactions.dislikes;
+  const likePct = total > 0 ? Math.round((reactions.likes / total) * 100) : 50;
 
   if (loading) {
     return (
@@ -236,6 +269,50 @@ export default function VideoPage() {
                       day: 'numeric',
                     })}
                   </time>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1 bg-[var(--bg-surface)] rounded-xl border border-[var(--border)] overflow-hidden">
+                    <button
+                      onClick={() => handleReaction('like')}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
+                        reactions.userReaction === 'like'
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'text-[var(--text-muted)] hover:bg-green-500/10 hover:text-green-400'
+                      }`}
+                      aria-label="Like"
+                    >
+                      <svg className="w-5 h-5" fill={reactions.userReaction === 'like' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                      </svg>
+                      {reactions.likes.toLocaleString()}
+                    </button>
+                    <button
+                      onClick={() => handleReaction('dislike')}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
+                        reactions.userReaction === 'dislike'
+                          ? 'bg-coral/20 text-coral'
+                          : 'text-[var(--text-muted)] hover:bg-coral/10 hover:text-coral'
+                      }`}
+                      aria-label="Dislike"
+                    >
+                      <svg className="w-5 h-5" fill={reactions.userReaction === 'dislike' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                      </svg>
+                      {reactions.dislikes.toLocaleString()}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="flex items-center gap-3 mb-1.5">
+                    <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden border border-[var(--border)]">
+                      <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500" style={{ width: `${likePct}%` }} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {total > 0 ? `${likePct}% liked this video` : 'No ratings yet'}
+                  </p>
                 </div>
               </div>
             </article>
