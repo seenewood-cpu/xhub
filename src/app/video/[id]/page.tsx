@@ -362,7 +362,7 @@ export default function VideoPage() {
                           {related.title}
                         </h3>
                         <p className="text-xs text-[var(--text-muted)] mt-1">
-                          {(related.view_count || 0).toLocaleString()} views
+                          {fakeEngagement(related.id).views.toLocaleString()} views
                         </p>
                       </div>
                     </Link>
