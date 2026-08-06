@@ -78,7 +78,7 @@ export default function GalleryPage() {
   async function fetchAllVideos() {
     setLoading(true);
     try {
-      const response = await fetch('/api/videos?limit=25&page=1');
+      const response = await fetch('/api/videos?limit=30&page=1');
       const result: PaginatedResponse = await response.json();
       setAllVideos(result.data);
     } catch (error) {
@@ -233,7 +233,7 @@ export default function GalleryPage() {
         </div>
       ) : (
         <div className="relative z-10 max-w-[1440px] mx-auto pb-16" id="all-videos">
-          {/* "All Videos" row — 25 most recent */}
+          {/* "All Videos" row — 30 most recent */}
           {allVideos.length > 0 && (
             <div className="scroll-rail" role="region" aria-label="All Videos">
               <h2 className="px-4 sm:px-12 mb-1 text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
