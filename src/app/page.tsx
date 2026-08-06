@@ -30,6 +30,14 @@ export default function GalleryPage() {
   const [searchResults, setSearchResults] = useState<Video[]>([]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cat = params.get('category');
+    if (cat) {
+      setSelectedCategory(cat);
+    }
+  }, []);
+
+  useEffect(() => {
     fetchCategories();
     fetch('/api/analytics', {
       method: 'POST',

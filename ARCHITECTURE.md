@@ -118,6 +118,7 @@ Admin (/admin):
 1. The gallery page (`/`) renders a permanent `<HeroGraphic>` with animated SVG art,
    then fetches 25 most recent videos from `GET /api/videos?limit=25&page=1` for the
    "All Videos" row, and fetches each category's videos with `?category=X&limit=50&page=N`.
+   If the URL contains `?category=X`, the page auto-selects that category filter.
 2. Videos are displayed in Netflix-style horizontal scroll rails. Category rows include
    Previous/Next pagination buttons when more than one page exists.
 3. Search and filter modes fetch without pagination limits (show all matching results).
@@ -410,7 +411,7 @@ Tracking is fire-and-forget from the client side:
 
 | Component | Behavior |
 |---|---|
-| **Header** | Transparent on load; gains `backdrop-filter: blur(20px)` + solid bg after 40px scroll. Dark/light theme toggle. Logo links to `/admin` when on admin pages, `/` otherwise |
+| **Header** | Transparent on load; gains `backdrop-filter: blur(20px)` + solid bg after 40px scroll. Dark/light theme toggle. **Menu dropdown** with category links. Logo links to `/admin` when on admin pages, `/` otherwise |
 | **Footer** | 3-column nav (vHub, Help, Legal) with 11 links to content pages. Appears on all pages including admin |
 | **ThemeProvider** | Persists theme to `localStorage` (`vh-theme` key), respects `prefers-color-scheme`, applies `data-theme` attribute to `<html>` |
 | **HeroGraphic** | Permanent SVG art with 3 rotating rings, orbiting dots, geometric shapes, pulsing glow |

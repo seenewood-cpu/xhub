@@ -2,18 +2,43 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
+
+interface Category {
+  id: number;
+  name: string;
+}
 
 export default function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const { theme, toggle } = useTheme();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((r) => r.json())
+      .then((data) => setCategories(data))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
@@ -42,12 +67,45 @@ export default function Header() {
           </Link>
 
           <div className="flex items-center gap-1">
-            <Link
-              href="/"
-              className="px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 bg-indigo/15 text-indigo border border-indigo/30 focus:outline-none focus:ring-2 focus:ring-accent hidden sm:inline-flex"
-            >
-              Gallery
-            </Link>
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 bg-indigo/15 text-indigo border border-indigo/30 focus:outline-none focus:ring-2 focus:ring-accent hidden sm:inline-flex items-center gap-2"
+              >
+                Menu
+                <svg className={`w-4 h-4 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 py-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-2xl backdrop-blur-xl z-50">
+                  <Link
+                    href="/"
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-indigo/10 hover:text-indigo transition-colors"
+                  >
+                    All Videos
+                  </Link>
+                  {categories.length > 0 && (
+                    <>
+                      <div className="my-1 border-t border-[var(--border)]" />
+                      {categories.map((cat) => (
+                        <Link
+                          key={cat.id}
+                          href={`/?category=${encodeURIComponent(cat.name)}`}
+                          onClick={() => setMenuOpen(false)}
+                          className="block px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-indigo/10 hover:text-indigo transition-colors"
+                        >
+                          {cat.name}
+                        </Link>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={toggle}
               className="p-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo"

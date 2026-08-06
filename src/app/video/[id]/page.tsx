@@ -201,7 +201,7 @@ export default function VideoPage() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              Back to Gallery
+              Back to Menu
             </Link>
           </div>
         </div>
@@ -241,7 +241,7 @@ export default function VideoPage() {
                 href="/"
                 className="text-[var(--text-muted)] hover:text-indigo transition-colors focus:outline-none focus:ring-2 focus:ring-indigo rounded px-1"
               >
-                Gallery
+                Menu
               </Link>
             </li>
             <li aria-hidden="true">

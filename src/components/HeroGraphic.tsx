@@ -249,7 +249,7 @@ export default function HeroGraphic() {
           </h1>
 
           <p className="text-xl sm:text-2xl text-[var(--text-secondary)] mb-10 max-w-xl mx-auto leading-relaxed">
-            Your personal video gallery.
+            Your personal video menu.
             <br />
             <span className="text-[var(--text-muted)]">Watch. Share. Enjoy.</span>
           </p>
