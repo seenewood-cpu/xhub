@@ -23,8 +23,10 @@ interface BannerConfig {
 }
 
 interface CropConfig {
-  offsetX: number;
-  offsetY: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   enabled: boolean;
 }
 
@@ -53,8 +55,10 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
     enabled: false,
   });
   const [crop, setCrop] = useState<CropConfig>({
-    offsetX: 0,
-    offsetY: 0,
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
     enabled: false,
   });
 
@@ -63,6 +67,8 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
   const ffmpegRef = useRef<FFmpeg | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const animationRef = useRef<number>(0);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const cropDragRef = useRef<{ type: string; startX: number; startY: number; startCrop: CropConfig } | null>(null);
 
   useEffect(() => {
     const initFFmpeg = async () => {
@@ -167,6 +173,85 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
     }
   }, []);
 
+  const getVideoDisplayRect = useCallback(() => {
+    if (!videoContainerRef.current || !videoRef.current) return null;
+    const container = videoContainerRef.current;
+    const video = videoRef.current;
+    const rect = video.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return {
+      left: rect.left - containerRect.left,
+      top: rect.top - containerRect.top,
+      width: rect.width,
+      height: rect.height,
+      videoWidth: video.videoWidth,
+      videoHeight: video.videoHeight,
+    };
+  }, []);
+
+  const initCropFrame = useCallback(() => {
+    const display = getVideoDisplayRect();
+    if (!display) return;
+    const margin = 0.1;
+    setCrop({
+      x: Math.round(display.width * margin),
+      y: Math.round(display.height * margin),
+      width: Math.round(display.width * (1 - margin * 2)),
+      height: Math.round(display.height * (1 - margin * 2)),
+      enabled: true,
+    });
+  }, [getVideoDisplayRect]);
+
+  const handleCropMouseDown = useCallback((e: React.MouseEvent, type: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const display = getVideoDisplayRect();
+    if (!display) return;
+    cropDragRef.current = { type, startX: e.clientX, startY: e.clientY, startCrop: { ...crop } };
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!cropDragRef.current) return;
+      const dx = ev.clientX - cropDragRef.current.startX;
+      const dy = ev.clientY - cropDragRef.current.startY;
+      const sc = cropDragRef.current.startCrop;
+      const t = cropDragRef.current.type;
+
+      let newX = sc.x;
+      let newY = sc.y;
+      let newW = sc.width;
+      let newH = sc.height;
+
+      if (t === 'move') {
+        newX = Math.max(0, Math.min(display.width - sc.width, sc.x + dx));
+        newY = Math.max(0, Math.min(display.height - sc.height, sc.y + dy));
+      } else {
+        if (t.includes('right')) newW = Math.max(40, Math.min(display.width - sc.x, sc.width + dx));
+        if (t.includes('bottom')) newH = Math.max(40, Math.min(display.height - sc.y, sc.height + dy));
+        if (t.includes('left')) {
+          newW = Math.max(40, sc.width - dx);
+          newX = sc.x + sc.width - newW;
+          if (newX < 0) { newW += newX; newX = 0; }
+        }
+        if (t.includes('top')) {
+          newH = Math.max(40, sc.height - dy);
+          newY = sc.y + sc.height - newH;
+          if (newY < 0) { newH += newY; newY = 0; }
+        }
+      }
+
+      setCrop({ x: Math.round(newX), y: Math.round(newY), width: Math.round(newW), height: Math.round(newH), enabled: true });
+    };
+
+    const handleMouseUp = () => {
+      cropDragRef.current = null;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [crop, getVideoDisplayRect]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -186,17 +271,24 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
 
       const hasTrim = trimRange.start > 0 || trimRange.end < videoDuration;
       const hasBanner = banner.enabled && banner.text;
-      const hasCrop = crop.enabled && (crop.offsetX !== 0 || crop.offsetY !== 0);
+      const hasCrop = crop.enabled && videoRef.current;
 
       let ffmpegArgs: string[] = [];
 
       if (hasBanner || hasCrop) {
         const filters: string[] = [];
 
-        if (hasCrop) {
-          const cropX = Math.abs(crop.offsetX);
-          const cropY = Math.abs(crop.offsetY);
-          filters.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`);
+        if (hasCrop && videoRef.current) {
+          const display = getVideoDisplayRect();
+          if (display) {
+            const scaleX = videoRef.current.videoWidth / display.width;
+            const scaleY = videoRef.current.videoHeight / display.height;
+            const cropX = Math.round(crop.x * scaleX);
+            const cropY = Math.round(crop.y * scaleY);
+            const cropW = Math.round(crop.width * scaleX);
+            const cropH = Math.round(crop.height * scaleY);
+            filters.push(`crop=${cropW}:${cropH}:${cropX}:${cropY}`);
+          }
         }
 
         if (hasBanner) {
@@ -290,7 +382,7 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
       {/* Video Preview */}
       {videoUrl && (
         <div className="mb-6">
-          <div className="relative bg-black rounded-lg overflow-hidden mb-4">
+          <div ref={videoContainerRef} className="relative bg-black rounded-lg overflow-hidden mb-4">
             <video
               ref={videoRef}
               src={videoUrl}
@@ -301,6 +393,44 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
               onPause={() => setIsPlaying(false)}
               onEnded={() => setIsPlaying(false)}
             />
+
+            {/* Crop Frame Overlay */}
+            {crop.enabled && (
+              <>
+                {/* Dark overlay outside crop area */}
+                <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(0,0,0,0.55)' }} />
+                {/* Clear crop window */}
+                <div
+                  className="absolute border-2 border-white cursor-move"
+                  style={{
+                    left: `${crop.x}px`,
+                    top: `${crop.y}px`,
+                    width: `${crop.width}px`,
+                    height: `${crop.height}px`,
+                    boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
+                  }}
+                  onMouseDown={(e) => handleCropMouseDown(e, 'move')}
+                >
+                  {/* Corner handles */}
+                  <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white rounded-full cursor-nw-resize shadow" onMouseDown={(e) => handleCropMouseDown(e, 'top-left')} />
+                  <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white rounded-full cursor-ne-resize shadow" onMouseDown={(e) => handleCropMouseDown(e, 'top-right')} />
+                  <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white rounded-full cursor-sw-resize shadow" onMouseDown={(e) => handleCropMouseDown(e, 'bottom-left')} />
+                  <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white rounded-full cursor-se-resize shadow" onMouseDown={(e) => handleCropMouseDown(e, 'bottom-right')} />
+                  {/* Edge handles */}
+                  <div className="absolute top-1/2 -left-1.5 w-3 h-3 bg-white rounded-full -translate-y-1/2 cursor-ew-resize shadow" onMouseDown={(e) => handleCropMouseDown(e, 'left')} />
+                  <div className="absolute top-1/2 -right-1.5 w-3 h-3 bg-white rounded-full -translate-y-1/2 cursor-ew-resize shadow" onMouseDown={(e) => handleCropMouseDown(e, 'right')} />
+                  <div className="absolute -top-1.5 left-1/2 w-3 h-3 bg-white rounded-full -translate-x-1/2 cursor-ns-resize shadow" onMouseDown={(e) => handleCropMouseDown(e, 'top')} />
+                  <div className="absolute -bottom-1.5 left-1/2 w-3 h-3 bg-white rounded-full -translate-x-1/2 cursor-ns-resize shadow" onMouseDown={(e) => handleCropMouseDown(e, 'bottom')} />
+                  {/* Grid lines */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute left-1/3 top-0 bottom-0 w-px bg-white/30" />
+                    <div className="absolute left-2/3 top-0 bottom-0 w-px bg-white/30" />
+                    <div className="absolute top-1/3 left-0 right-0 h-px bg-white/30" />
+                    <div className="absolute top-2/3 left-0 right-0 h-px bg-white/30" />
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Banner Preview Overlay */}
             {banner.enabled && banner.text && (
@@ -405,7 +535,13 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
               <input
                 type="checkbox"
                 checked={crop.enabled}
-                onChange={(e) => setCrop({ ...crop, enabled: e.target.checked })}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    initCropFrame();
+                  } else {
+                    setCrop({ ...crop, enabled: false });
+                  }
+                }}
                 className="w-4 h-4 text-blue-600"
               />
               <span className="text-sm text-gray-600">Enable</span>
@@ -413,52 +549,35 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
           </div>
 
           {crop.enabled && (
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm text-gray-600">Horizontal Offset (X)</label>
-                  <span className="text-sm font-medium text-gray-900">{crop.offsetX}px</span>
-                </div>
-                <input
-                  type="range"
-                  min={-200}
-                  max={200}
-                  step={1}
-                  value={crop.offsetX}
-                  onChange={(e) => setCrop({ ...crop, offsetX: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>-200px</span>
-                  <span>0px</span>
-                  <span>+200px</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm text-gray-600">Vertical Offset (Y)</label>
-                  <span className="text-sm font-medium text-gray-900">{crop.offsetY}px</span>
-                </div>
-                <input
-                  type="range"
-                  min={-200}
-                  max={200}
-                  step={1}
-                  value={crop.offsetY}
-                  onChange={(e) => setCrop({ ...crop, offsetY: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>-200px</span>
-                  <span>0px</span>
-                  <span>+200px</span>
-                </div>
-              </div>
-
-              <p className="text-xs text-gray-500">
-                Positive values crop from the edge inward. Negative values expand beyond the original frame.
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">
+                Drag the frame on the video to reposition. Drag the white handles to resize.
               </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">X Position</label>
+                  <span className="text-sm font-medium text-gray-900">{crop.x}px</span>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Y Position</label>
+                  <span className="text-sm font-medium text-gray-900">{crop.y}px</span>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Width</label>
+                  <span className="text-sm font-medium text-gray-900">{crop.width}px</span>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Height</label>
+                  <span className="text-sm font-medium text-gray-900">{crop.height}px</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={initCropFrame}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Reset frame
+              </button>
             </div>
           )}
         </div>
