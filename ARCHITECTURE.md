@@ -6,7 +6,8 @@ V HUB is a Netflix-inspired video gallery that streams videos hosted on Google D
 Features a Gen Z color palette, animated gradient backgrounds, horizontal scroll rails,
 glassmorphism, SVG art hero, admin panel with analytics, multi-category management,
 pagination, footer navigation with content pages, like/dislike reactions with fingerprint
-deduplication, deterministic fake engagement stats, and a title-case formatter for video entries.
+deduplication, deterministic fake engagement stats, title-case formatter, and interactive
+video crop frame in the Video Editor.
 
 | Aspect | Value |
 |---|---|
@@ -109,7 +110,7 @@ Admin (/admin):
 +-- Dashboard tab (analytics: total users, active users, page views, countries,
 |                   top videos, most-searched topics, recent searches)
 +-- Add Video tab (form with category dropdown, thumbnail picker, title auto-formats to Title Case)
-+-- Editor tab (edit existing videos)
++-- Video Editor tab (FFmpeg-based: trim, crop frame overlay, banner overlay, thumbnail generation)
 +-- Categories tab (add/delete categories)
 ```
 
@@ -180,7 +181,7 @@ video-hub/
 |   |   +-- Footer.tsx              # 3-column footer nav (vHub, Help, Legal) + copyright
 |   |   +-- VideoCard.tsx           # Netflix rail tile (hover expand, :has() dimming, view count)
 |   |   +-- VideoPlayer.tsx         # Drive iframe player with loading states + pop-out blocker
-|   |   +-- VideoEditor.tsx         # rich text editor for video descriptions
+|   |   +-- VideoEditor.tsx         # FFmpeg-based editor (trim, crop, banner, thumbnail)
 |   |   +-- ThumbnailPicker.tsx     # Google Drive thumbnail size selector
 |   |   +-- ContentPage.tsx         # shared layout for content pages (aurora + glass card)
 |   |   +-- CookieConsent.tsx       # cookie consent banner
@@ -449,7 +450,7 @@ The admin panel (`/admin`) has four tabs:
 |---|---|
 | **Dashboard** | Analytics overview: users, page views, countries, top videos, search trends, recent searches |
 | **Add Video** | Form with title (auto-formatted to Title Case), description, Google Drive URL, multi-category checkboxes with video counts (from `categories` table), thumbnail picker |
-| **Editor** | Lists all videos with edit/delete actions. Edit pre-fills the form with existing data including selected categories |
+| **Video Editor** | FFmpeg-based video processing: trim (start/end range), interactive crop frame (draggable + resizable overlay on video preview), banner overlay (scrolling text), thumbnail generation. Runs client-side via `@ffmpeg/ffmpeg` WASM |
 | **Categories** | Add new categories, delete existing ones. Categories populate the video form checkboxes and homepage filter pills. Shows category count based on `video_categories` junction |
 
 Authentication: email + password via `POST /api/auth`. Credentials checked against
@@ -529,3 +530,55 @@ Reactions are stored in the `video_reactions` table, deduped by browser fingerpr
   is at `supabase/migrations/002_create_analytics.sql`.
 - **Pagination**: search/filter mode returns all results without pagination. Only the
   homepage default view (no search, no filter) uses paginated fetching.
+
+## 16. Video Editor Crop Feature
+
+The Video Editor (`src/components/VideoEditor.tsx`) includes an interactive crop frame overlay for
+adjusting the visible region of a video before export. This runs entirely client-side via
+`@ffmpeg/ffmpeg` WASM.
+
+### CropConfig Interface
+
+```typescript
+interface CropConfig {
+  x: number;      // Top-left X position in native video pixels
+  y: number;      // Top-left Y position in native video pixels
+  width: number;  // Crop width in native video pixels
+  height: number; // Crop height in native video pixels
+  enabled: boolean;
+}
+```
+
+### Interactive Crop Frame
+
+- A draggable and resizable overlay is rendered directly on the `<video>` preview element.
+- Initialized at 80% of the video display area, centered.
+- **8 resize handles**: 4 corners (diagonal resize) + 4 edges (single-axis resize).
+- **Rule-of-thirds grid** lines inside the crop frame for composition guidance.
+- **Dark mask** outside the frame using `boxShadow: 0 0 0 9999px rgba(0,0,0,0.55)` trick
+  on the crop window div, avoiding complex rectangle calculations.
+- Mouse event listeners are attached to `window` during drag to ensure smooth tracking
+  even when the cursor moves outside the crop frame.
+
+### Display-to-Native Pixel Conversion
+
+The crop coordinates displayed in the UI are in screen/display pixels, but FFmpeg's `crop`
+filter requires native video pixel coordinates. Conversion uses:
+
+```typescript
+const scaleX = video.videoWidth / displayElement.offsetWidth;
+const scaleY = video.videoHeight / displayElement.offsetHeight;
+const nativeX = Math.round(displayX * scaleX);
+const nativeY = Math.round(displayY * scaleY);
+```
+
+### FFmpeg Crop Filter
+
+When `crop.enabled` is true, the following filter is prepended to the FFmpeg command chain:
+
+```
+crop=W:H:X:Y
+```
+
+Where W/H/X/Y are the converted native pixel values. This filter is applied before any other
+processing (trim, banner overlay, etc.).
