@@ -19,6 +19,7 @@ export default function AdminPage() {
     description: '',
     drive_url: '',
     category: '',
+    crop_settings: { zoom: 1, offsetX: 0, offsetY: 0 },
   });
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
@@ -193,6 +194,7 @@ export default function AdminPage() {
       description: video.description || '',
       drive_url: video.drive_url,
       category: video.category || '',
+      crop_settings: video.crop_settings || { zoom: 1, offsetX: 0, offsetY: 0 },
     });
     setSelectedCategoryIds(video.category_ids || []);
     setSelectedThumbnail(video.thumbnail_url || null);
@@ -202,7 +204,7 @@ export default function AdminPage() {
   }
 
   function resetForm() {
-    setFormData({ title: '', description: '', drive_url: '', category: '' });
+    setFormData({ title: '', description: '', drive_url: '', category: '', crop_settings: { zoom: 1, offsetX: 0, offsetY: 0 } });
     setSelectedCategoryIds([]);
     setEditingId(null);
     setSelectedThumbnail(null);
@@ -599,7 +601,77 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="label">Categories</label>
+                <label className="label">Crop Settings</label>
+                <p className="text-xs text-[var(--text-muted)] mb-3">Adjust how the video appears in the player. These settings apply visual cropping only.</p>
+                <div className="space-y-4 p-4 bg-[var(--bg-surface)] rounded-xl border border-[var(--border)]">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-sm text-[var(--text-secondary)]">Zoom</label>
+                      <span className="text-xs text-[var(--text-muted)] font-mono">{formData.crop_settings?.zoom?.toFixed(1) || '1.0'}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="0.1"
+                      value={formData.crop_settings?.zoom || 1}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        crop_settings: { ...formData.crop_settings!, zoom: parseFloat(e.target.value) }
+                      })}
+                      className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-sm text-[var(--text-secondary)]">Horizontal Offset</label>
+                      <span className="text-xs text-[var(--text-muted)] font-mono">{formData.crop_settings?.offsetX || 0}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-50"
+                      max="50"
+                      step="1"
+                      value={formData.crop_settings?.offsetX || 0}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        crop_settings: { ...formData.crop_settings!, offsetX: parseInt(e.target.value) }
+                      })}
+                      className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-sm text-[var(--text-secondary)]">Vertical Offset</label>
+                      <span className="text-xs text-[var(--text-muted)] font-mono">{formData.crop_settings?.offsetY || 0}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-50"
+                      max="50"
+                      step="1"
+                      value={formData.crop_settings?.offsetY || 0}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        crop_settings: { ...formData.crop_settings!, offsetY: parseInt(e.target.value) }
+                      })}
+                      className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({
+                      ...formData,
+                      crop_settings: { zoom: 1, offsetX: 0, offsetY: 0 }
+                    })}
+                    className="text-xs text-indigo hover:text-indigo/80 transition-colors"
+                  >
+                    Reset to default
+                  </button>
+                </div>
+              </div>
+
+              <div>
                 <div className="flex flex-wrap gap-3">
                   {categories.map((cat) => {
                     const videoCount = videos.filter(v => v.category_ids && v.category_ids.includes(cat.id)).length;

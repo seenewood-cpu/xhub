@@ -258,7 +258,7 @@ export default function VideoPage() {
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 min-w-0">
             <article>
-              <VideoPlayer fileId={video.drive_file_id} title={video.title} />
+              <VideoPlayer fileId={video.drive_file_id} title={video.title} cropSettings={video.crop_settings} />
 
               <div className="mt-6">
                 <h1 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-4">{video.title}</h1>

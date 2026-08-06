@@ -160,6 +160,7 @@ export async function POST(request: NextRequest) {
           drive_file_id: fileId,
           thumbnail_url: body.thumbnail_url || '',
           category: categoryIds.length > 0 ? '' : '',
+          crop_settings: body.crop_settings || { zoom: 1, offsetX: 0, offsetY: 0 },
         },
       ])
       .select()

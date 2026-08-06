@@ -102,6 +102,7 @@ export async function PUT(
         drive_url: body.drive_url || existing.drive_url,
         drive_file_id: fileId,
         thumbnail_url: body.thumbnail_url ?? existing.thumbnail_url,
+        crop_settings: body.crop_settings ?? existing.crop_settings,
       })
       .eq('id', id)
       .select()

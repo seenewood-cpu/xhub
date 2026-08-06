@@ -3,13 +3,20 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { getDriveEmbedUrl } from '@/lib/client-utils';
 
+interface CropSettings {
+  zoom: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 interface VideoPlayerProps {
   fileId: string;
   title: string;
   startAt?: number;
+  cropSettings?: CropSettings;
 }
 
-export default function VideoPlayer({ fileId, title, startAt = 0 }: VideoPlayerProps) {
+export default function VideoPlayer({ fileId, title, startAt = 0, cropSettings }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -206,6 +213,10 @@ export default function VideoPlayer({ fileId, title, startAt = 0 }: VideoPlayerP
           src={embedUrl}
           title={title}
           className="w-full h-full"
+          style={cropSettings && cropSettings.zoom !== 1 ? {
+            transform: `scale(${cropSettings.zoom}) translate(${cropSettings.offsetX}%, ${cropSettings.offsetY}%)`,
+            transformOrigin: 'center center',
+          } : undefined}
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
           allowFullScreen
           onLoad={handleIframeLoad}
