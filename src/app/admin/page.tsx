@@ -600,14 +600,14 @@ export default function AdminPage() {
                   placeholder="Enter video description (optional)" />
               </div>
 
-              <div>
-                <label className="label">Crop Settings</label>
-                <p className="text-xs text-[var(--text-muted)] mb-3">Adjust how the video appears in the player. These settings apply visual cropping only.</p>
-                <div className="space-y-4 p-4 bg-[var(--bg-surface)] rounded-xl border border-[var(--border)]">
+              <div className="glass-card p-5">
+                <label className="label text-base font-semibold">Crop Settings</label>
+                <p className="text-xs text-[var(--text-muted)] mb-4">Adjust how the video appears in the player. These settings apply visual cropping only.</p>
+                <div className="space-y-5">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-sm text-[var(--text-secondary)]">Zoom</label>
-                      <span className="text-xs text-[var(--text-muted)] font-mono">{formData.crop_settings?.zoom?.toFixed(1) || '1.0'}x</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-[var(--text-primary)]">Zoom</label>
+                      <span className="text-sm text-indigo font-mono font-bold">{formData.crop_settings?.zoom?.toFixed(1) || '1.0'}x</span>
                     </div>
                     <input
                       type="range"
@@ -621,11 +621,14 @@ export default function AdminPage() {
                       })}
                       className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
                     />
+                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+                      <span>1x</span><span>2x</span><span>3x</span>
+                    </div>
                   </div>
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-sm text-[var(--text-secondary)]">Horizontal Offset</label>
-                      <span className="text-xs text-[var(--text-muted)] font-mono">{formData.crop_settings?.offsetX || 0}%</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-[var(--text-primary)]">Horizontal Offset</label>
+                      <span className="text-sm text-indigo font-mono font-bold">{formData.crop_settings?.offsetX || 0}%</span>
                     </div>
                     <input
                       type="range"
@@ -639,11 +642,14 @@ export default function AdminPage() {
                       })}
                       className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
                     />
+                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+                      <span>-50%</span><span>0%</span><span>+50%</span>
+                    </div>
                   </div>
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-sm text-[var(--text-secondary)]">Vertical Offset</label>
-                      <span className="text-xs text-[var(--text-muted)] font-mono">{formData.crop_settings?.offsetY || 0}%</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-[var(--text-primary)]">Vertical Offset</label>
+                      <span className="text-sm text-indigo font-mono font-bold">{formData.crop_settings?.offsetY || 0}%</span>
                     </div>
                     <input
                       type="range"
@@ -657,6 +663,9 @@ export default function AdminPage() {
                       })}
                       className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
                     />
+                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+                      <span>-50%</span><span>0%</span><span>+50%</span>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -664,7 +673,7 @@ export default function AdminPage() {
                       ...formData,
                       crop_settings: { zoom: 1, offsetX: 0, offsetY: 0 }
                     })}
-                    className="text-xs text-indigo hover:text-indigo/80 transition-colors"
+                    className="text-sm text-indigo hover:text-indigo/80 transition-colors underline"
                   >
                     Reset to default
                   </button>
@@ -672,6 +681,7 @@ export default function AdminPage() {
               </div>
 
               <div>
+                <label className="label">Categories</label>
                 <div className="flex flex-wrap gap-3">
                   {categories.map((cat) => {
                     const videoCount = videos.filter(v => v.category_ids && v.category_ids.includes(cat.id)).length;
