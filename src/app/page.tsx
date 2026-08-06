@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import VideoCard from '@/components/VideoCard';
 import HeroGraphic from '@/components/HeroGraphic';
 import { Video } from '@/types/video';
@@ -13,20 +13,11 @@ interface PaginatedResponse {
   totalPages: number;
 }
 
-const CATEGORY_PAGE_SIZE = 50;
-
 export default function GalleryPage() {
   const [allVideos, setAllVideos] = useState<Video[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [loading, setLoading] = useState(true);
-
-  const [categoryVideos, setCategoryVideos] = useState<Record<string, Video[]>>({});
-  const [categoryPages, setCategoryPages] = useState<Record<string, number>>({});
-  const [categoryTotalPages, setCategoryTotalPages] = useState<Record<string, number>>({});
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
-
   const [searchResults, setSearchResults] = useState<Video[]>([]);
 
   useEffect(() => {
@@ -38,7 +29,6 @@ export default function GalleryPage() {
   }, []);
 
   useEffect(() => {
-    fetchCategories();
     fetch('/api/analytics', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -58,23 +48,6 @@ export default function GalleryPage() {
     }
   }, [search, selectedCategory]);
 
-  async function fetchCategories() {
-    try {
-      const response = await fetch('/api/categories');
-      const data = await response.json();
-      const cats = data.map((c: { name: string }) => c.name);
-      setCategories(cats);
-
-      const initialPages: Record<string, number> = {};
-      cats.forEach((c: string) => { initialPages[c] = 1; });
-      setCategoryPages(initialPages);
-
-      cats.forEach((cat: string) => fetchCategoryPage(cat, 1));
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
-  }
-
   async function fetchAllVideos() {
     setLoading(true);
     try {
@@ -85,19 +58,6 @@ export default function GalleryPage() {
       console.error('Error fetching videos:', error);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function fetchCategoryPage(cat: string, page: number) {
-    try {
-      const response = await fetch(`/api/videos?category=${encodeURIComponent(cat)}&limit=${CATEGORY_PAGE_SIZE}&page=${page}`);
-      const result: PaginatedResponse = await response.json();
-      setCategoryVideos(prev => ({ ...prev, [cat]: result.data }));
-      setCategoryPages(prev => ({ ...prev, [cat]: result.page }));
-      setCategoryTotalPages(prev => ({ ...prev, [cat]: result.totalPages }));
-      setCategoryCounts(prev => ({ ...prev, [cat]: result.total }));
-    } catch (error) {
-      console.error(`Error fetching category ${cat}:`, error);
     }
   }
 
@@ -126,10 +86,6 @@ export default function GalleryPage() {
     }
   }
 
-  const handleCategoryPageChange = useCallback((cat: string, newPage: number) => {
-    fetchCategoryPage(cat, newPage);
-  }, []);
-
   return (
     <div className="min-h-screen animated-gradient-bg">
       {/* Aurora blobs */}
@@ -144,7 +100,7 @@ export default function GalleryPage() {
         <HeroGraphic />
       )}
 
-      {/* Search & Filters */}
+      {/* Search */}
       <div className="relative z-10 max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 pt-12 pb-6" id="browse">
         <div className="relative max-w-xl mb-8">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -163,26 +119,6 @@ export default function GalleryPage() {
           />
           <p id="search-hint" className="sr-only">Search by video title</p>
         </div>
-
-        {categories.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-8">
-            <button
-              onClick={() => setSelectedCategory('')}
-              className={`filter-pill ${selectedCategory === '' ? 'active' : ''}`}
-            >
-              All
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`filter-pill ${selectedCategory === cat ? 'active' : ''}`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Content */}
@@ -233,7 +169,6 @@ export default function GalleryPage() {
         </div>
       ) : (
         <div className="relative z-10 max-w-[1440px] mx-auto pb-16" id="all-videos">
-          {/* "All Videos" row — 30 most recent */}
           {allVideos.length > 0 && (
             <div className="scroll-rail" role="region" aria-label="All Videos">
               <h2 className="px-4 sm:px-12 mb-1 text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
@@ -249,58 +184,6 @@ export default function GalleryPage() {
               </div>
             </div>
           )}
-
-          {/* Category rows with pagination */}
-          {categories.map((cat) => {
-            const catVids = categoryVideos[cat] || [];
-            const currentPage = categoryPages[cat] || 1;
-            const totalPages = categoryTotalPages[cat] || 1;
-
-            if (catVids.length === 0 && currentPage === 1) return null;
-
-            return (
-              <div key={cat} className="mb-4" role="region" aria-label={cat}>
-                <div className="scroll-rail">
-                  <h2 className="px-4 sm:px-12 mb-1 text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
-                    <span className="w-1 h-5 bg-gradient-to-b from-coral to-lavender rounded-full" />
-                    {cat}
-                    {categoryCounts[cat] !== undefined && (
-                      <span className="text-sm font-normal text-[var(--text-muted)]">({categoryCounts[cat]})</span>
-                    )}
-                  </h2>
-                  <div className="scroll-rail-inner" role="list">
-                    {catVids.map((video) => (
-                      <div key={video.id} role="listitem">
-                        <VideoCard video={video} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-3 mt-3 px-4">
-                    <button
-                      onClick={() => handleCategoryPageChange(cat, currentPage - 1)}
-                      disabled={currentPage <= 1}
-                      className="px-4 py-2 text-sm font-medium rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed hover:border-indigo transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-sm text-[var(--text-secondary)]">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                      onClick={() => handleCategoryPageChange(cat, currentPage + 1)}
-                      disabled={currentPage >= totalPages}
-                      className="px-4 py-2 text-sm font-medium rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed hover:border-indigo transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
         </div>
       )}
     </div>
