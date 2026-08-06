@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Video, VideoFormData } from '@/types/video';
 import { isValidDriveUrl, extractDriveFileId } from '@/lib/client-utils';
 import VideoEditor from '@/components/VideoEditor';
@@ -41,6 +41,7 @@ export default function AdminPage() {
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const cropSectionRef = useRef<HTMLDivElement>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState('');
   const [categorySuccess, setCategorySuccess] = useState('');
@@ -201,6 +202,25 @@ export default function AdminPage() {
     setFormError('');
     setFormSuccess('');
     setActiveTab('add');
+  }
+
+  function handleCrop(video: Video) {
+    setEditingId(video.id);
+    setFormData({
+      title: video.title,
+      description: video.description || '',
+      drive_url: video.drive_url,
+      category: video.category || '',
+      crop_settings: video.crop_settings || { zoom: 1, offsetX: 0, offsetY: 0 },
+    });
+    setSelectedCategoryIds(video.category_ids || []);
+    setSelectedThumbnail(video.thumbnail_url || null);
+    setFormError('');
+    setFormSuccess('');
+    setActiveTab('add');
+    setTimeout(() => {
+      cropSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 200);
   }
 
   function resetForm() {
@@ -600,9 +620,9 @@ export default function AdminPage() {
                   placeholder="Enter video description (optional)" />
               </div>
 
-              <div className="bg-indigo/5 border border-indigo/20 rounded-xl p-5">
+              <div ref={cropSectionRef} className="bg-emerald-500/10 border-2 border-emerald-400/40 rounded-xl p-6 scroll-mt-32">
                 <label className="label text-base font-semibold flex items-center gap-2">
-                  <svg className="w-4 h-4 text-indigo" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   Crop Settings
@@ -869,6 +889,13 @@ export default function AdminPage() {
                       aria-label={`Edit ${video.title}`}>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button onClick={() => handleCrop(video)}
+                      className="p-2 text-[var(--text-muted)] hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all"
+                      aria-label={`Crop ${video.title}`}>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </button>
                     <button onClick={() => handleDelete(video.id)}
