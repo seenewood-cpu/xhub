@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Video, VideoFormData } from '@/types/video';
 import { isValidDriveUrl, extractDriveFileId } from '@/lib/client-utils';
 import VideoEditor from '@/components/VideoEditor';
@@ -41,7 +41,6 @@ export default function AdminPage() {
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
-  const cropSectionRef = useRef<HTMLDivElement>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState('');
   const [categorySuccess, setCategorySuccess] = useState('');
@@ -202,25 +201,6 @@ export default function AdminPage() {
     setFormError('');
     setFormSuccess('');
     setActiveTab('add');
-  }
-
-  function handleCrop(video: Video) {
-    setEditingId(video.id);
-    setFormData({
-      title: video.title,
-      description: video.description || '',
-      drive_url: video.drive_url,
-      category: video.category || '',
-      crop_settings: video.crop_settings || { zoom: 1, offsetX: 0, offsetY: 0 },
-    });
-    setSelectedCategoryIds(video.category_ids || []);
-    setSelectedThumbnail(video.thumbnail_url || null);
-    setFormError('');
-    setFormSuccess('');
-    setActiveTab('add');
-    setTimeout(() => {
-      cropSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 200);
   }
 
   function resetForm() {
@@ -620,91 +600,6 @@ export default function AdminPage() {
                   placeholder="Enter video description (optional)" />
               </div>
 
-              <div ref={cropSectionRef} className="bg-emerald-500/10 border-2 border-emerald-400/40 rounded-xl p-6 scroll-mt-32">
-                <label className="label text-base font-semibold flex items-center gap-2">
-                  <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Crop Settings
-                </label>
-                <p className="text-xs text-[var(--text-muted)] mb-4">Adjust how the video appears in the player. These settings apply visual cropping only.</p>
-                <div className="space-y-5">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-[var(--text-primary)]">Zoom</label>
-                      <span className="text-sm text-indigo font-mono font-bold">{formData.crop_settings?.zoom?.toFixed(1) || '1.0'}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="3"
-                      step="0.1"
-                      value={formData.crop_settings?.zoom || 1}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        crop_settings: { ...formData.crop_settings!, zoom: parseFloat(e.target.value) }
-                      })}
-                      className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
-                    />
-                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
-                      <span>1x</span><span>2x</span><span>3x</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-[var(--text-primary)]">Horizontal Offset</label>
-                      <span className="text-sm text-indigo font-mono font-bold">{formData.crop_settings?.offsetX || 0}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-50"
-                      max="50"
-                      step="1"
-                      value={formData.crop_settings?.offsetX || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        crop_settings: { ...formData.crop_settings!, offsetX: parseInt(e.target.value) }
-                      })}
-                      className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
-                    />
-                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
-                      <span>-50%</span><span>0%</span><span>+50%</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-[var(--text-primary)]">Vertical Offset</label>
-                      <span className="text-sm text-indigo font-mono font-bold">{formData.crop_settings?.offsetY || 0}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-50"
-                      max="50"
-                      step="1"
-                      value={formData.crop_settings?.offsetY || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        crop_settings: { ...formData.crop_settings!, offsetY: parseInt(e.target.value) }
-                      })}
-                      className="w-full h-2 bg-[var(--bg-card)] rounded-lg appearance-none cursor-pointer accent-indigo"
-                    />
-                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
-                      <span>-50%</span><span>0%</span><span>+50%</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({
-                      ...formData,
-                      crop_settings: { zoom: 1, offsetX: 0, offsetY: 0 }
-                    })}
-                    className="text-sm text-indigo hover:text-indigo/80 transition-colors underline"
-                  >
-                    Reset to default
-                  </button>
-                </div>
-              </div>
-
               <div>
                 <label className="label">Categories</label>
                 <div className="flex flex-wrap gap-3">
@@ -889,13 +784,6 @@ export default function AdminPage() {
                       aria-label={`Edit ${video.title}`}>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button onClick={() => handleCrop(video)}
-                      className="p-2 text-[var(--text-muted)] hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all"
-                      aria-label={`Crop ${video.title}`}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </button>
                     <button onClick={() => handleDelete(video.id)}

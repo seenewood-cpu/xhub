@@ -22,6 +22,12 @@ interface BannerConfig {
   enabled: boolean;
 }
 
+interface CropConfig {
+  offsetX: number;
+  offsetY: number;
+  enabled: boolean;
+}
+
 export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>('');
@@ -44,6 +50,11 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
     color: '#ffffff',
     backgroundColor: '#000000',
     fontSize: 24,
+    enabled: false,
+  });
+  const [crop, setCrop] = useState<CropConfig>({
+    offsetX: 0,
+    offsetY: 0,
     enabled: false,
   });
 
@@ -175,12 +186,25 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
 
       const hasTrim = trimRange.start > 0 || trimRange.end < videoDuration;
       const hasBanner = banner.enabled && banner.text;
+      const hasCrop = crop.enabled && (crop.offsetX !== 0 || crop.offsetY !== 0);
 
       let ffmpegArgs: string[] = [];
 
-      if (hasBanner) {
-        const bannerHeight = banner.fontSize + 20;
-        const vf = `drawbox=x=0:y=0:w=iw:h=${bannerHeight}:color=${banner.backgroundColor}@0.8,drawtext=text='${banner.text}':fontcolor=${banner.color}:fontsize=${banner.fontSize}:x=(w-text_w)/2:y=${bannerHeight / 2 - banner.fontSize / 2}`;
+      if (hasBanner || hasCrop) {
+        const filters: string[] = [];
+
+        if (hasCrop) {
+          const cropX = Math.abs(crop.offsetX);
+          const cropY = Math.abs(crop.offsetY);
+          filters.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`);
+        }
+
+        if (hasBanner) {
+          const bannerHeight = banner.fontSize + 20;
+          filters.push(`drawbox=x=0:y=0:w=iw:h=${bannerHeight}:color=${banner.backgroundColor}@0.8,drawtext=text='${banner.text}':fontcolor=${banner.color}:fontsize=${banner.fontSize}:x=(w-text_w)/2:y=${bannerHeight / 2 - banner.fontSize / 2}`);
+        }
+
+        const vf = filters.join(',');
 
         ffmpegArgs = ['-i', 'input.mp4'];
         if (hasTrim) {
@@ -369,6 +393,74 @@ export default function VideoEditor({ onVideoProcessed }: VideoEditorProps) {
           <p className="text-sm text-gray-500">
             Duration: {formatTime(trimRange.end - trimRange.start)}
           </p>
+        </div>
+      )}
+
+      {/* Crop Controls */}
+      {videoUrl && (
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-medium text-gray-900">Crop Video</h3>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={crop.enabled}
+                onChange={(e) => setCrop({ ...crop, enabled: e.target.checked })}
+                className="w-4 h-4 text-blue-600"
+              />
+              <span className="text-sm text-gray-600">Enable</span>
+            </label>
+          </div>
+
+          {crop.enabled && (
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm text-gray-600">Horizontal Offset (X)</label>
+                  <span className="text-sm font-medium text-gray-900">{crop.offsetX}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={-200}
+                  max={200}
+                  step={1}
+                  value={crop.offsetX}
+                  onChange={(e) => setCrop({ ...crop, offsetX: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>-200px</span>
+                  <span>0px</span>
+                  <span>+200px</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm text-gray-600">Vertical Offset (Y)</label>
+                  <span className="text-sm font-medium text-gray-900">{crop.offsetY}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={-200}
+                  max={200}
+                  step={1}
+                  value={crop.offsetY}
+                  onChange={(e) => setCrop({ ...crop, offsetY: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>-200px</span>
+                  <span>0px</span>
+                  <span>+200px</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                Positive values crop from the edge inward. Negative values expand beyond the original frame.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
